@@ -58,11 +58,11 @@ public class SecurityConfig {
         return http.build();
     }
 
-
+    
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://127.0.0.1:5500", "http://localhost:50847","http://localhost:62666", "http://localhost:52144", "http://localhost:62950", "http://localhost:51050", "http://localhost:61988", "http://localhost:51357")); // Specify frontend origin
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:50847")); // Specify frontend origin
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true); // Allow credentials

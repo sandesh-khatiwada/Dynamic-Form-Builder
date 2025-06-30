@@ -74,6 +74,17 @@
 			<version>0.11.5</version>
 		</dependency>
 		<dependency>
+			<groupId>org.json</groupId>
+			<artifactId>json</artifactId>
+			<version>20231013</version>
+		</dependency>
+			<!-- https://mvnrepository.com/artifact/org.everit.json/org.everit.json.schema -->
+			<dependency>
+				<groupId>org.everit.json</groupId>
+				<artifactId>org.everit.json.schema</artifactId>
+				<version>1.5.1</version>
+			</dependency>
+		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-impl</artifactId>
 			<version>0.11.5</version>

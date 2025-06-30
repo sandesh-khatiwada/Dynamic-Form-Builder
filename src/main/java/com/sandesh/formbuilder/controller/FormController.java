@@ -1,5 +1,7 @@
 package com.sandesh.formbuilder.controller;
 
+import com.sandesh.formbuilder.dto.FormDataRequest;
+import com.sandesh.formbuilder.dto.FormDataResponse;
 import com.sandesh.formbuilder.dto.FormRequest;
 import com.sandesh.formbuilder.dto.FormResponse;
 import com.sandesh.formbuilder.service.FormService;
@@ -12,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
@@ -48,6 +51,35 @@ public class FormController {
 
         return new ResponseEntity<>(apiResponse,HttpStatus.OK);
 
+    }
+
+    @PostMapping("/forms/data")
+    public ResponseEntity<APIResponse<FormDataResponse>> fillUpForm(@RequestBody FormDataRequest formDataRequest){
+
+        FormDataResponse formDataResponse = formService.fillUpForm(formDataRequest);
+
+
+        APIResponse<FormDataResponse> apiResponse = new APIResponse<>(
+                HttpStatus.OK,
+                "Form filled up succesfully",
+                formDataResponse
+        );
+
+        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
+
+    }
+
+    @GetMapping("/forms/{id}")
+    public ResponseEntity<APIResponse<List<FormDataResponse>>> getFormDataByTemplateId(@PathVariable UUID id){
+        List<FormDataResponse> formDataResponses = formService.getFormDataByTemplateId(id);
+
+        APIResponse<List<FormDataResponse>> apiResponse = new APIResponse<>(
+                HttpStatus.OK,
+                "Form data retrieved succesfully",
+                formDataResponses
+        );
+
+        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
     }
 
 
