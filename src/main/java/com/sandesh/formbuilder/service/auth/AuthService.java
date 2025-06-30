@@ -1,4 +1,4 @@
-package com.sandesh.formbuilder.service;
+package com.sandesh.formbuilder.service.auth;
 
 import com.sandesh.formbuilder.dto.LoginRequest;
 import com.sandesh.formbuilder.dto.LoginResponse;

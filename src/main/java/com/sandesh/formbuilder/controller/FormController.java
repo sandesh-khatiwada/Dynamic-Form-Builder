@@ -4,7 +4,7 @@ import com.sandesh.formbuilder.dto.FormDataRequest;
 import com.sandesh.formbuilder.dto.FormDataResponse;
 import com.sandesh.formbuilder.dto.FormRequest;
 import com.sandesh.formbuilder.dto.FormResponse;
-import com.sandesh.formbuilder.service.FormService;
+import com.sandesh.formbuilder.service.form.FormService;
 import com.sandesh.formbuilder.util.APIResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -98,7 +98,6 @@ public class FormController {
 
         return new ResponseEntity<>(apiResponse,HttpStatus.OK);
     }
-
 
 
     @DeleteMapping("/forms/{id}")

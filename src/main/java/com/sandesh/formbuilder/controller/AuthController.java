@@ -4,7 +4,7 @@ import com.sandesh.formbuilder.dto.LoginRequest;
 import com.sandesh.formbuilder.dto.LoginResponse;
 import com.sandesh.formbuilder.dto.RegisterRequest;
 import com.sandesh.formbuilder.dto.RegisterResponse;
-import com.sandesh.formbuilder.service.AuthService;
+import com.sandesh.formbuilder.service.auth.AuthService;
 import com.sandesh.formbuilder.util.APIResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

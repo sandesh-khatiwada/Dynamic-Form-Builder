@@ -1,4 +1,4 @@
-package com.sandesh.formbuilder.service;
+package com.sandesh.formbuilder.service.form;
 
 import com.sandesh.formbuilder.dto.FormDataRequest;
 import com.sandesh.formbuilder.dto.FormDataResponse;

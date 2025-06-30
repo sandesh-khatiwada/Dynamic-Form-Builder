@@ -1,4 +1,4 @@
-package com.sandesh.formbuilder.service;
+package com.sandesh.formbuilder.service.auth;
 
 import com.sandesh.formbuilder.dto.LoginRequest;
 import com.sandesh.formbuilder.dto.LoginResponse;
@@ -11,9 +11,7 @@ import com.sandesh.formbuilder.repository.RoleRepository;
 import com.sandesh.formbuilder.repository.UserRepository;
 import com.sandesh.formbuilder.repository.UserRepositoryCustom;
 import com.sandesh.formbuilder.util.JwtUtil;
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.BadRequestException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
