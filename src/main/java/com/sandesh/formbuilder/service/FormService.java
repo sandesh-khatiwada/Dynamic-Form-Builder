@@ -13,7 +13,10 @@ public interface FormService {
 
     FormResponse createForm(FormRequest formCreationRequest);
     List<FormResponse> getAllForms();
-    FormDataResponse fillUpForm(FormDataRequest formDataRequest);
+    FormDataResponse fillUpForm(FormDataRequest formDataRequest, UUID formTemplateId);
     List<FormDataResponse> getFormDataByTemplateId(UUID templateId);
+    FormResponse getFormTemplateById(UUID templateId);
+    void deleteFormTemplateById(UUID templateId);
+    void deleteFormDataById(UUID formId);
 
     }

@@ -83,9 +83,13 @@ public class FormServiceImpl implements FormService{
 
         }
 
-    public FormDataResponse fillUpForm(FormDataRequest formDataRequest) {
-        UUID formId = formDataRequest.getId();
+    public FormDataResponse fillUpForm(FormDataRequest formDataRequest, UUID formId) {
+
         List<Map<String, Object>> jsonData = formDataRequest.getJsonData();
+
+        if(formId==null){
+            throw new IllegalArgumentException("Form Template ID is required");
+        }
 
         // Retrieve the form template
         FormTemplate formTemplate = formRepository.findById(formId)
@@ -194,7 +198,7 @@ public class FormServiceImpl implements FormService{
             formRepository.save(formTemplate);
 
             FormDataResponse formDataResponse = new FormDataResponse();
-            formDataResponse.setId(formDataRequest.getId());
+            formDataResponse.setId(formId);
             formDataResponse.setJsonData(formDataRequest.getJsonData());
 
             return formDataResponse;
@@ -244,6 +248,66 @@ public class FormServiceImpl implements FormService{
 
         return formDataResponses;
     }
+
+    @Override
+    public FormResponse getFormTemplateById(UUID templateId){
+
+        if(templateId==null){
+            throw new IllegalArgumentException("Template ID is required");
+        }
+
+        FormTemplate formTemplate = formRepository.findById(templateId).orElseThrow(()->new IllegalArgumentException("Form Template with template ID : "+templateId+" does not exist."));
+
+        try {
+            FormResponse formResponse = new FormResponse();
+            formResponse.setId(formTemplate.getId());
+            formResponse.setName(formTemplate.getName());
+
+            List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {
+            });
+
+
+            formResponse.setJsonSchema(parsedSchema);
+
+            return formResponse;
+
+        }catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Failed to parse JSON schema for form, " +formTemplate.getId()+ ", "+ e.getMessage());
+
+        }
+
+    }
+
+
+    @Override
+    public void deleteFormTemplateById(UUID templateId){
+
+        if(templateId==null){
+            throw new IllegalArgumentException("Template ID is required");
+        }
+
+        if(formRepository.findById(templateId).isPresent()) {
+            formRepository.deleteById(templateId);
+        }else{
+            throw new IllegalArgumentException("Form Template with Template ID: "+templateId+" does not exist. ");
+        }
+
+    }
+
+    @Override
+    public void deleteFormDataById(UUID formId){
+        if(formId==null){
+            throw new IllegalArgumentException("Form ID is required");
+        }
+
+        if(formDataRepository.findById(formId).isPresent()) {
+            formDataRepository.deleteById(formId);
+        }else{
+            throw new IllegalArgumentException("Form Data with ID: "+formId+" does not exist. ");
+        }
+
+    }
+
 
 }
 

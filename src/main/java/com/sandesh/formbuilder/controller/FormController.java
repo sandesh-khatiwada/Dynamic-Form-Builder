@@ -53,10 +53,27 @@ public class FormController {
 
     }
 
-    @PostMapping("/forms/data")
-    public ResponseEntity<APIResponse<FormDataResponse>> fillUpForm(@RequestBody FormDataRequest formDataRequest){
 
-        FormDataResponse formDataResponse = formService.fillUpForm(formDataRequest);
+    @GetMapping("/forms/{id}")
+    public ResponseEntity<APIResponse<FormResponse>> getAllForms(@PathVariable UUID id){
+        FormResponse form= formService.getFormTemplateById(id);
+
+
+        APIResponse<FormResponse> apiResponse = new APIResponse<>(
+                HttpStatus.OK,
+                "Form retrieved succesfully",
+                form
+        );
+
+        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
+
+    }
+
+
+    @PostMapping("/forms/{id}/data")
+    public ResponseEntity<APIResponse<FormDataResponse>> fillUpForm(@RequestBody FormDataRequest formDataRequest, @PathVariable UUID id){
+
+        FormDataResponse formDataResponse = formService.fillUpForm(formDataRequest, id);
 
 
         APIResponse<FormDataResponse> apiResponse = new APIResponse<>(
@@ -69,7 +86,7 @@ public class FormController {
 
     }
 
-    @GetMapping("/forms/{id}")
+    @GetMapping("/forms/{id}/data")
     public ResponseEntity<APIResponse<List<FormDataResponse>>> getFormDataByTemplateId(@PathVariable UUID id){
         List<FormDataResponse> formDataResponses = formService.getFormDataByTemplateId(id);
 
@@ -81,6 +98,37 @@ public class FormController {
 
         return new ResponseEntity<>(apiResponse,HttpStatus.OK);
     }
+
+
+
+    @DeleteMapping("/forms/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<APIResponse<Object>> deleteFormTemplateByTemplateId(@PathVariable UUID id){
+
+        formService.deleteFormTemplateById(id);
+
+        APIResponse<Object> apiResponse = new APIResponse<>(
+                HttpStatus.OK,
+                "Form Template deleted succesfully"
+        );
+
+        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
+    }
+
+    @DeleteMapping("/forms/{id}/data")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<APIResponse<Object>> deleteFormDataById(@PathVariable UUID id){
+
+        formService.deleteFormDataById(id);
+
+        APIResponse<Object> apiResponse = new APIResponse<>(
+                HttpStatus.OK,
+                "Form Data deleted succesfully"
+        );
+
+        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
+    }
+
 
 
 
