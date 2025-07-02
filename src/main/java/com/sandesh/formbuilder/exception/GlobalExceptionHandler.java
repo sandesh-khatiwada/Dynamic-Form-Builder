@@ -5,6 +5,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
@@ -99,6 +100,15 @@ public class GlobalExceptionHandler{
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<APIResponse<Object>> handleAccessDeniedException(AccessDeniedException ex) {
+        APIResponse<Object> response = new APIResponse<>(
+                HttpStatus.FORBIDDEN,
+                "Access Denied: You are not allowed to perform this operation",
+                Collections.singletonList(ex.getMessage())
+        );
+        return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
+    }
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<APIResponse<Object>> handleRuntimeException(RuntimeException ex) {

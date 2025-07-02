@@ -8,6 +8,6 @@ import java.util.UUID;
 
 @Data
 public class FormDataResponse {
-    private UUID id;
+    private UUID formDataId;
     private List<Map<String, Object>> jsonData;
 }

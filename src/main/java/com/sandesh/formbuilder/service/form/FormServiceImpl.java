@@ -9,15 +9,23 @@ import com.sandesh.formbuilder.dto.FormRequest;
 import com.sandesh.formbuilder.dto.FormResponse;
 import com.sandesh.formbuilder.entity.FormData;
 import com.sandesh.formbuilder.entity.FormTemplate;
+import com.sandesh.formbuilder.entity.User;
 import com.sandesh.formbuilder.repository.FormDataRepository;
 import com.sandesh.formbuilder.repository.FormRepository;
+import com.sandesh.formbuilder.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
-
-
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import java.util.*;
 
@@ -27,6 +35,7 @@ public class FormServiceImpl implements FormService{
 
     private final FormRepository formRepository;
     private final FormDataRepository formDataRepository;
+    private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
 
@@ -43,7 +52,7 @@ public class FormServiceImpl implements FormService{
             FormTemplate form = formRepository.save(formTemplate);
 
             FormResponse formCreationResponse = new FormResponse();
-            formCreationResponse.setId(form.getId());
+            formCreationResponse.setTemplateId(form.getId());
             formCreationResponse.setName(form.getName());
             formCreationResponse.setJsonSchema(formCreationRequest.getJsonSchema());
 
@@ -63,7 +72,7 @@ public class FormServiceImpl implements FormService{
 
                 try {
                     FormResponse formResponse = new FormResponse();
-                    formResponse.setId(formTemplate.getId());
+                    formResponse.setTemplateId(formTemplate.getId());
                     formResponse.setName(formTemplate.getName());
 
                     List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {
@@ -81,12 +90,19 @@ public class FormServiceImpl implements FormService{
         }
 
     public FormDataResponse fillUpForm(FormDataRequest formDataRequest, UUID formId) {
-
         List<Map<String, Object>> jsonData = formDataRequest.getJsonData();
 
-        if(formId==null){
+        if (formId == null) {
             throw new IllegalArgumentException("Form Template ID is required");
         }
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("User not authenticated");
+        }
+
+        String email = ((UserDetails) authentication.getPrincipal()).getUsername();
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalStateException("User not found"));
 
         // Retrieve the form template
         FormTemplate formTemplate = formRepository.findById(formId)
@@ -105,7 +121,7 @@ public class FormServiceImpl implements FormService{
 
             // Check if the number of items matches
             if (schemaArray.length() != dataArray.length()) {
-                throw new IllegalArgumentException("JSON data length (" + dataArray.length() + ") does not match schema length (" + schemaArray.length() + ")");
+                throw new IllegalArgumentException("Form data length (" + dataArray.length() + ") does not match template length (" + schemaArray.length() + ")");
             }
 
             // Validate each item in jsonData against the corresponding schema item
@@ -115,42 +131,43 @@ public class FormServiceImpl implements FormService{
 
                 // Check required fields
                 if (!dataItem.has("label") || !dataItem.has("type") || !dataItem.has("key") || !dataItem.has("value")) {
-                    throw new IllegalArgumentException("JSON data at index " + i + " missing required fields (label, type, key, value)");
+                    throw new IllegalArgumentException("Data at index " + i + " missing required fields (label, type, key, value)");
                 }
 
                 // Check field values
                 if (!schemaItem.getString("label").equals(dataItem.getString("label"))) {
-                    throw new IllegalArgumentException("JSON data at index " + i + ": label mismatch, expected '" + schemaItem.getString("label") + "', got '" + dataItem.getString("label") + "'");
+                    throw new IllegalArgumentException("Data at index " + i + ": label mismatch, expected '" + schemaItem.getString("label") + "', got '" + dataItem.getString("label") + "'");
                 }
                 if (!schemaItem.getString("type").equals(dataItem.getString("type"))) {
-                    throw new IllegalArgumentException("JSON data at index " + i + ": type mismatch, expected '" + schemaItem.getString("type") + "', got '" + dataItem.getString("type") + "'");
+                    throw new IllegalArgumentException("Data at index " + i + ": type mismatch, expected '" + schemaItem.getString("type") + "', got '" + dataItem.getString("type") + "'");
                 }
                 if (!schemaItem.getString("key").equals(dataItem.getString("key"))) {
-                    throw new IllegalArgumentException("JSON data at index " + i + ": key mismatch, expected '" + schemaItem.getString("key") + "', got '" + dataItem.getString("key") + "'");
+                    throw new IllegalArgumentException("Data at index " + i + ": key mismatch, expected '" + schemaItem.getString("key") + "', got '" + dataItem.getString("key") + "'");
                 }
 
                 // Check required field
                 if (schemaItem.has("required") && schemaItem.getBoolean("required") && dataItem.isNull("value")) {
-                    throw new IllegalArgumentException("JSON data at index " + i + ": value is required for key '" + schemaItem.getString("key") + "'");
+                    throw new IllegalArgumentException("Data at index " + i + ": value is required for key '" + schemaItem.getString("key") + "'");
                 }
 
                 // Validate value based on type
-                String type = schemaItem.getString("type");
+                String type = schemaItem.getString("type").toLowerCase();
                 Object value = dataItem.get("value");
                 switch (type) {
                     case "text":
+                    case "textarea":
                         if (!(value instanceof String)) {
-                            throw new IllegalArgumentException("JSON data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a string");
+                            throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a string");
                         }
                         break;
                     case "number":
                         if (!(value instanceof Number)) {
-                            throw new IllegalArgumentException("JSON data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a number");
+                            throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a number");
                         }
                         break;
                     case "dropdown":
                         if (!(value instanceof String)) {
-                            throw new IllegalArgumentException("JSON data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a string");
+                            throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a string");
                         }
                         if (schemaItem.has("options")) {
                             JSONArray options = schemaItem.getJSONArray("options");
@@ -159,12 +176,52 @@ public class FormServiceImpl implements FormService{
                                 validOptions.add(options.getString(j));
                             }
                             if (!validOptions.contains(value)) {
-                                throw new IllegalArgumentException("JSON data at index " + i + ": value '" + value + "' for key '" + schemaItem.getString("key") + "' is not a valid option");
+                                throw new IllegalArgumentException("Data at index " + i + ": value '" + value + "' for key '" + schemaItem.getString("key") + "' is not a valid option");
                             }
                         }
                         break;
+                    case "date":
+                        if (value != null) {
+                            try {
+                                LocalDate.parse((String) value, DateTimeFormatter.ISO_LOCAL_DATE);
+                            } catch (Exception e) {
+                                throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a valid date (YYYY-MM-DD)");
+                            }
+                        }
+                        break;
+                    case "time":
+                        if (value != null) {
+                            try {
+                                LocalTime.parse((String) value, DateTimeFormatter.ISO_LOCAL_TIME);
+                            } catch (Exception e) {
+                                throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a valid time (HH:MM:SS)");
+                            }
+                        }
+                        break;
+                    case "datetime":
+                        if (value != null) {
+                            try {
+                                LocalDateTime.parse((String) value, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                            } catch (Exception e) {
+                                throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a valid datetime (YYYY-MM-DDTHH:MM:SS)");
+                            }
+                        }
+                        break;
+                    case "email":
+                        if (!(value instanceof String)) {
+                            throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a string");
+                        }
+                        if (value != null && !((String) value).matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                            throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a valid email address");
+                        }
+                        break;
+                    case "checkbox":
+                        if (value!=null && !(value instanceof Boolean)) {
+                            throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a boolean");
+                        }
+                        break;
                     default:
-                        throw new IllegalArgumentException("JSON schema at index " + i + ": unsupported type '" + type + "'");
+                        throw new IllegalArgumentException("Schema at index " + i + ": unsupported type '" + type + "'");
                 }
 
                 // Check options field if present
@@ -172,35 +229,34 @@ public class FormServiceImpl implements FormService{
                     JSONArray schemaOptions = schemaItem.getJSONArray("options");
                     JSONArray dataOptions = dataItem.getJSONArray("options");
                     if (schemaOptions.length() != dataOptions.length()) {
-                        throw new IllegalArgumentException("JSON data at index " + i + ": options length mismatch for key '" + schemaItem.getString("key") + "'");
+                        throw new IllegalArgumentException("Data at index " + i + ": options length mismatch for key '" + schemaItem.getString("key") + "'");
                     }
                     for (int j = 0; j < schemaOptions.length(); j++) {
                         if (!schemaOptions.getString(j).equals(dataOptions.getString(j))) {
-                            throw new IllegalArgumentException("JSON data at index " + i + ": options mismatch for key '" + schemaItem.getString("key") + "'");
+                            throw new IllegalArgumentException("Data at index " + i + ": options mismatch for key '" + schemaItem.getString("key") + "'");
                         }
                     }
                 }
             }
 
-
             FormData formData = new FormData();
             formData.setJsonData(dataArray.toString());
             formData.setFormTemplate(formTemplate);
+            formData.setUser(user);
 
+            FormData savedFormData = formDataRepository.save(formData);
 
-            formDataRepository.save(formData);
-
-            //  add to formTemplate's formDataList
+            // Add to formTemplate's formDataList
             formTemplate.getFormDataList().add(formData);
             formRepository.save(formTemplate);
 
             FormDataResponse formDataResponse = new FormDataResponse();
-            formDataResponse.setId(formId);
+            formDataResponse.setFormDataId(savedFormData.getId());
             formDataResponse.setJsonData(formDataRequest.getJsonData());
 
             return formDataResponse;
         } catch (org.json.JSONException e) {
-            throw new IllegalArgumentException("Invalid JSON schema for form template with id: " + formId + ": " + e.getMessage());
+            throw new IllegalArgumentException("Invalid schema for form template with id: " + formId + ": " + e.getMessage());
         } catch (Exception e) {
             throw new IllegalArgumentException("Error processing form data: " + e.getMessage());
         }
@@ -218,7 +274,7 @@ public class FormServiceImpl implements FormService{
 
         for (FormData data : formData) {
             FormDataResponse formDataResponse = new FormDataResponse();
-            formDataResponse.setId(data.getId());
+            formDataResponse.setFormDataId(data.getId());
 
             // Convert JSON string to List<Map<String, Object>>
             List<Map<String, Object>> jsonDataList = new ArrayList<>();
@@ -236,7 +292,7 @@ public class FormServiceImpl implements FormService{
                 }
                 formDataResponse.setJsonData(jsonDataList);
             } catch (org.json.JSONException e) {
-                throw new IllegalArgumentException("Error parsing JSON data for FormData with id: " + data.getId() + ": " + e.getMessage());
+                throw new IllegalArgumentException("Error parsing FormData with id: " + data.getId() + ": " + e.getMessage());
             }
 
             formDataResponses.add(formDataResponse);
@@ -256,7 +312,7 @@ public class FormServiceImpl implements FormService{
 
         try {
             FormResponse formResponse = new FormResponse();
-            formResponse.setId(formTemplate.getId());
+            formResponse.setTemplateId(formTemplate.getId());
             formResponse.setName(formTemplate.getName());
 
             List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {
@@ -268,7 +324,7 @@ public class FormServiceImpl implements FormService{
             return formResponse;
 
         }catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to parse JSON schema for form, " +formTemplate.getId()+ ", "+ e.getMessage());
+            throw new IllegalArgumentException("Failed to parse schema for form, " +formTemplate.getId()+ ", "+ e.getMessage());
 
         }
 
@@ -296,11 +352,22 @@ public class FormServiceImpl implements FormService{
             throw new IllegalArgumentException("Form ID is required");
         }
 
-        if(formDataRepository.findById(formId).isPresent()) {
-            formDataRepository.deleteById(formId);
-        }else{
-            throw new IllegalArgumentException("Form Data with ID: "+formId+" does not exist. ");
+        FormData formData = formDataRepository.findById(formId).orElseThrow(()->new IllegalArgumentException("Form data with provide id does not exist"));
+
+        String userEmail = formData.getUser().getEmail();
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("User not authenticated");
         }
+
+        String email = ((UserDetails) authentication.getPrincipal()).getUsername();
+
+        if(!Objects.equals(email, userEmail)){
+            throw new AccessDeniedException("You don't have access to delete this form.");
+        }
+
+        formDataRepository.deleteById(formId);
 
     }
 

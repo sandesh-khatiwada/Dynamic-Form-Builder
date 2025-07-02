@@ -9,7 +9,7 @@ import java.util.UUID;
 @Data
 public class FormResponse {
 
-    private UUID id;
+    private UUID templateId;
     private String name;
     private List<Map<String, Object>> jsonSchema;
 

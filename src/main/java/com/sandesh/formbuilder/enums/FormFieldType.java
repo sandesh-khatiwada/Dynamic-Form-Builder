@@ -1,5 +1,5 @@
 package com.sandesh.formbuilder.enums;
 
 public enum FormFieldType {
-    TEXT, NUMBER, DROPDOWN
+    TEXT, NUMBER, DROPDOWN, DATETIME, TEXTAREA, EMAIL, CHECKBOX,DATE, TIME
 }

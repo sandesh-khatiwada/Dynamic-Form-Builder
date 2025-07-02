@@ -31,7 +31,7 @@ public class FormController {
 
         APIResponse<FormResponse> apiResponse = new APIResponse<>(
                 HttpStatus.CREATED,
-                "Form created Succesfully",
+                "Form created successfully",
                 formCreationResponse
         );
 
@@ -45,14 +45,13 @@ public class FormController {
 
         APIResponse<List<FormResponse>> apiResponse = new APIResponse<>(
                 HttpStatus.OK,
-                "Forms retrieved succesfully",
+                "Forms retrieved successfully",
                 forms
         );
 
         return new ResponseEntity<>(apiResponse,HttpStatus.OK);
 
     }
-
 
     @GetMapping("/forms/{id}")
     public ResponseEntity<APIResponse<FormResponse>> getAllForms(@PathVariable UUID id){
@@ -61,7 +60,7 @@ public class FormController {
 
         APIResponse<FormResponse> apiResponse = new APIResponse<>(
                 HttpStatus.OK,
-                "Form retrieved succesfully",
+                "Form retrieved successfully",
                 form
         );
 
@@ -78,7 +77,7 @@ public class FormController {
 
         APIResponse<FormDataResponse> apiResponse = new APIResponse<>(
                 HttpStatus.OK,
-                "Form filled up succesfully",
+                "Form filled up successfully",
                 formDataResponse
         );
 
@@ -92,7 +91,7 @@ public class FormController {
 
         APIResponse<List<FormDataResponse>> apiResponse = new APIResponse<>(
                 HttpStatus.OK,
-                "Form data retrieved succesfully",
+                "Form data retrieved successfully",
                 formDataResponses
         );
 
@@ -108,21 +107,23 @@ public class FormController {
 
         APIResponse<Object> apiResponse = new APIResponse<>(
                 HttpStatus.OK,
-                "Form Template deleted succesfully"
+                "Form Template deleted successfully"
         );
 
         return new ResponseEntity<>(apiResponse,HttpStatus.OK);
     }
 
+
+
+
     @DeleteMapping("/forms/{id}/data")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<APIResponse<Object>> deleteFormDataById(@PathVariable UUID id){
 
         formService.deleteFormDataById(id);
 
         APIResponse<Object> apiResponse = new APIResponse<>(
                 HttpStatus.OK,
-                "Form Data deleted succesfully"
+                "Form Data deleted successfully"
         );
 
         return new ResponseEntity<>(apiResponse,HttpStatus.OK);

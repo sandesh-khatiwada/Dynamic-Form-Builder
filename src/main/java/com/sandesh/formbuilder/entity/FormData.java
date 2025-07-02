@@ -11,6 +11,7 @@ import java.util.UUID;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Table(name = "form_data")
 public class FormData {
 
     @Id
@@ -23,4 +24,8 @@ public class FormData {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "form_template_id", nullable = false)
     private FormTemplate formTemplate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 }

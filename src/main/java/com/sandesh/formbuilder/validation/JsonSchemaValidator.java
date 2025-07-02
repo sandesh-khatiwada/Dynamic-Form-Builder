@@ -1,4 +1,5 @@
-package com.sandesh.formbuilder.validation;
+
+        package com.sandesh.formbuilder.validation;
 
 import com.sandesh.formbuilder.enums.FormFieldType;
 import jakarta.validation.ConstraintValidator;
@@ -50,19 +51,22 @@ public class JsonSchemaValidator implements ConstraintValidator<ValidJsonSchema,
             } catch (IllegalArgumentException e) {
                 context.disableDefaultConstraintViolation();
                 context.buildConstraintViolationWithTemplate("Field at index " + i + ": type must be one of " +
-                                String.join(", ", FormFieldType.values()[0].toString(), FormFieldType.values()[1].toString(), FormFieldType.values()[2].toString()))
+                                String.join(", ", FormFieldType.values()[0].toString(), FormFieldType.values()[1].toString(), FormFieldType.values()[2].toString(), FormFieldType.values()[3].toString(), FormFieldType.values()[4].toString(), FormFieldType.values()[5].toString(), FormFieldType.values()[6].toString(), FormFieldType.values()[7].toString(), FormFieldType.values()[8].toString()))
                         .addConstraintViolation();
                 return false;
             }
 
-            // Additional validation for dropdown type
-            if ("dropdown".equalsIgnoreCase(type)) {
-                if (!field.containsKey("options") || field.get("options") == null || ((List<?>) field.get("options")).isEmpty()) {
-                    context.disableDefaultConstraintViolation();
-                    context.buildConstraintViolationWithTemplate("Field at index " + i + ": options are required for dropdown type")
-                            .addConstraintViolation();
-                    return false;
-                }
+            // Additional validation for specific types
+            switch (type.toUpperCase()) {
+                case "DROPDOWN":
+                    if (!field.containsKey("options") || field.get("options") == null || ((List<?>) field.get("options")).isEmpty()) {
+                        context.disableDefaultConstraintViolation();
+                        context.buildConstraintViolationWithTemplate("Field at index " + i + ": options are required for dropdown type")
+                                .addConstraintViolation();
+                        return false;
+                    }
+                    break;
+                // No value type checks here, as this is schema validation
             }
         }
         return true;
