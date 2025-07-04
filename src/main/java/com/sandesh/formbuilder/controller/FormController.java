@@ -8,6 +8,7 @@ import com.sandesh.formbuilder.service.form.FormService;
 import com.sandesh.formbuilder.util.APIResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -114,8 +115,6 @@ public class FormController {
     }
 
 
-
-
     @DeleteMapping("/forms/{id}/data")
     public ResponseEntity<APIResponse<Object>> deleteFormDataById(@PathVariable UUID id){
 
@@ -130,6 +129,32 @@ public class FormController {
     }
 
 
+    @PutMapping("/forms/data/{id}")
+    public ResponseEntity<APIResponse<FormDataResponse>> editFormById(@PathVariable UUID id, @RequestBody FormDataRequest newFormData){
+        FormDataResponse formDataResponse= formService.editFormDataById(id,newFormData);
+
+        APIResponse<FormDataResponse> apiResponse = new APIResponse<>(
+                HttpStatus.OK,
+                "Form data edited successfully",
+                formDataResponse
+        );
+
+        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
+    }
+
+    @GetMapping("/forms/data/{id}")
+    public ResponseEntity<APIResponse<FormDataResponse>> getFormDataById(@PathVariable UUID id){
+        FormDataResponse formDataResponse = formService.getFormDataById(id);
+
+        APIResponse<FormDataResponse> apiResponse = new APIResponse<>(
+                HttpStatus.OK,
+                "Form data retrieved successfully",
+                formDataResponse
+        );
+
+        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
+
+    }
 
 
 }

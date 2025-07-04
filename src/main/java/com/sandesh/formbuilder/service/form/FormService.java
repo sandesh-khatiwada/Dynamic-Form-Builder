@@ -18,5 +18,9 @@ public interface FormService {
     FormResponse getFormTemplateById(UUID templateId);
     void deleteFormTemplateById(UUID templateId);
     void deleteFormDataById(UUID formId);
+    FormDataResponse editFormDataById(UUID id,FormDataRequest newFormData);
+    FormDataResponse getFormDataById(UUID id);
 
-    }
+
+
+}

@@ -22,27 +22,25 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-
 import java.util.*;
 
 @Service
 @RequiredArgsConstructor
-public class FormServiceImpl implements FormService{
+public class FormServiceImpl implements FormService {
 
     private final FormRepository formRepository;
     private final FormDataRepository formDataRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
-
     @Override
     public FormResponse createForm(FormRequest formCreationRequest) {
         try {
-
             // Serialize jsonSchema to string for storage
             String jsonSchemaString = objectMapper.writeValueAsString(formCreationRequest.getJsonSchema());
 
@@ -57,41 +55,33 @@ public class FormServiceImpl implements FormService{
             formCreationResponse.setJsonSchema(formCreationRequest.getJsonSchema());
 
             return formCreationResponse;
-
-        }catch (JsonProcessingException exception){
+        } catch (JsonProcessingException exception) {
             throw new IllegalArgumentException("Invalid JSON schema: " + exception.getMessage());
-
         }
     }
 
-    public List<FormResponse> getAllForms(){
+    @Override
+    public List<FormResponse> getAllForms() {
+        List<FormTemplate> forms = formRepository.findAll();
+        List<FormResponse> formResponses = new ArrayList<>();
+        for (FormTemplate formTemplate : forms) {
+            try {
+                FormResponse formResponse = new FormResponse();
+                formResponse.setTemplateId(formTemplate.getId());
+                formResponse.setName(formTemplate.getName());
 
-            List<FormTemplate> forms = formRepository.findAll();
-            List<FormResponse> formResponses = new ArrayList<>();
-            forms.forEach((formTemplate -> {
-
-                try {
-                    FormResponse formResponse = new FormResponse();
-                    formResponse.setTemplateId(formTemplate.getId());
-                    formResponse.setName(formTemplate.getName());
-
-                    List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {
-                    });
-
-
-                    formResponse.setJsonSchema(parsedSchema);
-                    formResponses.add(formResponse);
-                } catch (JsonProcessingException e) {
-                    throw new IllegalArgumentException("Failed to parse JSON schema for form, " +formTemplate.getId()+ ", "+ e.getMessage());
-
-                }
-            }));
-            return formResponses;
+                List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {});
+                formResponse.setJsonSchema(parsedSchema);
+                formResponses.add(formResponse);
+            } catch (JsonProcessingException e) {
+                throw new IllegalArgumentException("Failed to parse JSON schema for form " + formTemplate.getId() + ": " + e.getMessage());
+            }
         }
+        return formResponses;
+    }
 
+    @Override
     public FormDataResponse fillUpForm(FormDataRequest formDataRequest, UUID formId) {
-        List<Map<String, Object>> jsonData = formDataRequest.getJsonData();
-
         if (formId == null) {
             throw new IllegalArgumentException("Form Template ID is required");
         }
@@ -108,16 +98,226 @@ public class FormServiceImpl implements FormService{
         FormTemplate formTemplate = formRepository.findById(formId)
                 .orElseThrow(() -> new IllegalArgumentException("Form Template with id: " + formId + " does not exist."));
 
+        try {
+            FormData formData = validateFormData(formTemplate, formDataRequest.getJsonData());
+            formData.setFormTemplate(formTemplate);
+            formData.setUser(user);
+
+            FormData savedFormData = formDataRepository.save(formData);
+
+            // Add to formTemplate's formDataList
+            formTemplate.getFormDataList().add(formData);
+            formRepository.save(formTemplate);
+
+            FormDataResponse formDataResponse = new FormDataResponse();
+            formDataResponse.setFormDataId(savedFormData.getId());
+            formDataResponse.setJsonData(formDataRequest.getJsonData());
+
+            return formDataResponse;
+        } catch (org.json.JSONException e) {
+            throw new IllegalArgumentException("Invalid schema for form template with id: " + formId + ": " + e.getMessage());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Error parsing form data: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public List<FormDataResponse> getFormDataByTemplateId(UUID templateId) {
+        if (templateId == null) {
+            throw new IllegalArgumentException("Template Id is required");
+        }
+
+        List<FormData> formData = formDataRepository.findByFormTemplateId(templateId);
+        List<FormDataResponse> formDataResponses = new ArrayList<>();
+
+        for (FormData data : formData) {
+            FormDataResponse formDataResponse = new FormDataResponse();
+            formDataResponse.setFormDataId(data.getId());
+
+            // Convert JSON string to List<Map<String, Object>>
+            List<Map<String, Object>> jsonDataList = new ArrayList<>();
+            try {
+                if (data.getJsonData() != null && !data.getJsonData().trim().isEmpty()) {
+                    // Parse the stored JSON string using ObjectMapper to handle any format
+                    jsonDataList = objectMapper.readValue(data.getJsonData(), new TypeReference<List<Map<String, Object>>>() {});
+                }
+                formDataResponse.setJsonData(jsonDataList);
+            } catch (JsonProcessingException e) {
+                throw new IllegalArgumentException("Error parsing FormData with id: " + data.getId() + ": " + e.getMessage());
+            }
+
+            formDataResponses.add(formDataResponse);
+        }
+
+        return formDataResponses;
+    }
+
+    @Override
+    public FormResponse getFormTemplateById(UUID templateId) {
+        if (templateId == null) {
+            throw new IllegalArgumentException("Template ID is required");
+        }
+
+        FormTemplate formTemplate = formRepository.findById(templateId)
+                .orElseThrow(() -> new IllegalArgumentException("Form Template with template ID: " + templateId + " does not exist."));
+
+        try {
+            FormResponse formResponse = new FormResponse();
+            formResponse.setTemplateId(formTemplate.getId());
+            formResponse.setName(formTemplate.getName());
+
+            List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {});
+            formResponse.setJsonSchema(parsedSchema);
+
+            return formResponse;
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Failed to parse schema for form " + formTemplate.getId() + ": " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void deleteFormTemplateById(UUID templateId) {
+        if (templateId == null) {
+            throw new IllegalArgumentException("Template ID is required");
+        }
+
+        if (formRepository.findById(templateId).isPresent()) {
+            formRepository.deleteById(templateId);
+        } else {
+            throw new IllegalArgumentException("Form Template with Template ID: " + templateId + " does not exist.");
+        }
+    }
+
+    @Override
+    public void deleteFormDataById(UUID formId) {
+        if (formId == null) {
+            throw new IllegalArgumentException("Form ID is required");
+        }
+
+        FormData formData = formDataRepository.findById(formId)
+                .orElseThrow(() -> new IllegalArgumentException("Form data with provided id does not exist"));
+
+        String userEmail = formData.getUser().getEmail();
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("User not authenticated");
+        }
+
+        String email = ((UserDetails) authentication.getPrincipal()).getUsername();
+
+        if (!Objects.equals(email, userEmail)) {
+            throw new AccessDeniedException("You don't have access to delete this form.");
+        }
+
+        formDataRepository.deleteById(formId);
+    }
+
+    @Override
+    @Transactional
+    public FormDataResponse editFormDataById(UUID id, FormDataRequest newFormData) {
+        if (id == null) {
+            throw new IllegalArgumentException("Form Data ID is required");
+        }
+
+        // Retrieve the existing FormData entity
+        FormData existingFormData = formDataRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Form Data ID is invalid"));
+
+
+        //Only user who has created the form data can edit it
+        String userEmail = existingFormData.getUser().getEmail();
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("User not authenticated");
+        }
+
+        String email = ((UserDetails) authentication.getPrincipal()).getUsername();
+
+        if (!Objects.equals(email, userEmail)) {
+            throw new AccessDeniedException("You do not have access to edit this form data.");
+        }
+
+
+        // Validate the new form data against the template
+        FormTemplate formTemplate = existingFormData.getFormTemplate();
+        validateFormData(formTemplate, newFormData.getJsonData());
+
+        // Update the existing FormData with the new jsonData
+        try {
+            existingFormData.setJsonData(objectMapper.writeValueAsString(newFormData.getJsonData()));
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Failed to serialize jsonData: " + e.getMessage());
+        }
+
+        // Save the updated entity
+        FormData savedFormData = formDataRepository.save(existingFormData);
+
+        // Prepare the response
+        FormDataResponse formDataResponse = new FormDataResponse();
+        formDataResponse.setFormDataId(savedFormData.getId());
+        formDataResponse.setJsonData(newFormData.getJsonData());
+
+        return formDataResponse;
+    }
+
+    @Override
+    public FormDataResponse getFormDataById(UUID id){
+        if(id==null){
+            throw  new IllegalArgumentException("Form Data Id is required");
+        }
+
+
+        FormData formData = formDataRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Form data with provided id does not exist"));
+
+
+
+        //Only user who has created the form data can access it
+        String userEmail = formData.getUser().getEmail();
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("User not authenticated");
+        }
+
+        String email = ((UserDetails) authentication.getPrincipal()).getUsername();
+
+        if (!Objects.equals(email, userEmail)) {
+            throw new AccessDeniedException("You can not access this form data.");
+        }
+
+        try {
+            FormDataResponse formDataResponse = new FormDataResponse();
+            formDataResponse.setFormDataId(formData.getId());
+
+            List<Map<String, Object>> jsonDataList = new ArrayList<>();
+            jsonDataList = objectMapper.readValue(formData.getJsonData(), new TypeReference<List<Map<String, Object>>>() {
+            });
+
+
+            formDataResponse.setJsonData(jsonDataList);
+            return formDataResponse;
+
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Error parsing FormData with id: " + formData.getId() + ": " + e.getMessage());
+        }
+
+    }
+
+    private FormData validateFormData(FormTemplate formTemplate, List<Map<String, Object>> jsonData) {
         // Get and validate the JSON schema (field definitions)
         String jsonSchemaString = formTemplate.getJsonSchema();
         if (jsonSchemaString == null || jsonSchemaString.trim().isEmpty()) {
-            throw new IllegalArgumentException("JSON schema is null or empty for form template with id: " + formId);
+            throw new IllegalArgumentException("JSON schema is null or empty for form template with id: " + formTemplate.getId());
         }
 
         try {
             // Parse the schema as a JSONArray
             JSONArray schemaArray = new JSONArray(jsonSchemaString);
-            JSONArray dataArray = new JSONArray(jsonData);
+            JSONArray dataArray = new JSONArray(objectMapper.writeValueAsString(jsonData)); // Ensure proper JSON array
 
             // Check if the number of items matches
             if (schemaArray.length() != dataArray.length()) {
@@ -125,6 +325,7 @@ public class FormServiceImpl implements FormService{
             }
 
             // Validate each item in jsonData against the corresponding schema item
+            FormData formData = new FormData();
             for (int i = 0; i < schemaArray.length(); i++) {
                 JSONObject schemaItem = schemaArray.getJSONObject(i);
                 JSONObject dataItem = dataArray.getJSONObject(i);
@@ -216,7 +417,7 @@ public class FormServiceImpl implements FormService{
                         }
                         break;
                     case "checkbox":
-                        if (value!=null && !(value instanceof Boolean)) {
+                        if (value != null && !(value instanceof Boolean)) {
                             throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a boolean");
                         }
                         break;
@@ -239,139 +440,18 @@ public class FormServiceImpl implements FormService{
                 }
             }
 
-            FormData formData = new FormData();
-            formData.setJsonData(dataArray.toString());
-            formData.setFormTemplate(formTemplate);
-            formData.setUser(user);
+            // Store as a properly formatted JSON string
+            formData.setJsonData(objectMapper.writeValueAsString(jsonData));
+            return formData;
 
-            FormData savedFormData = formDataRepository.save(formData);
-
-            // Add to formTemplate's formDataList
-            formTemplate.getFormDataList().add(formData);
-            formRepository.save(formTemplate);
-
-            FormDataResponse formDataResponse = new FormDataResponse();
-            formDataResponse.setFormDataId(savedFormData.getId());
-            formDataResponse.setJsonData(formDataRequest.getJsonData());
-
-            return formDataResponse;
         } catch (org.json.JSONException e) {
-            throw new IllegalArgumentException("Invalid schema for form template with id: " + formId + ": " + e.getMessage());
+            throw new IllegalArgumentException("Invalid JSON schema for form template with id: " + formTemplate.getId() + ": " + e.getMessage());
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Error serializing form data: " + e.getMessage());
         } catch (Exception e) {
             throw new IllegalArgumentException("Error processing form data: " + e.getMessage());
         }
     }
 
-    @Override
-    @Transactional
-    public List<FormDataResponse> getFormDataByTemplateId(UUID templateId) {
-        if (templateId == null) {
-            throw new IllegalArgumentException("Template Id is required");
-        }
-
-        List<FormData> formData = formDataRepository.findByFormTemplateId(templateId);
-        List<FormDataResponse> formDataResponses = new ArrayList<>();
-
-        for (FormData data : formData) {
-            FormDataResponse formDataResponse = new FormDataResponse();
-            formDataResponse.setFormDataId(data.getId());
-
-            // Convert JSON string to List<Map<String, Object>>
-            List<Map<String, Object>> jsonDataList = new ArrayList<>();
-            try {
-                if (data.getJsonData() != null && !data.getJsonData().trim().isEmpty()) {
-                    JSONArray jsonArray = new JSONArray(data.getJsonData());
-                    for (int i = 0; i < jsonArray.length(); i++) {
-                        JSONObject jsonObject = jsonArray.getJSONObject(i);
-                        Map<String, Object> map = new HashMap<>();
-                        for (String key : jsonObject.keySet()) {
-                            map.put(key, jsonObject.get(key));
-                        }
-                        jsonDataList.add(map);
-                    }
-                }
-                formDataResponse.setJsonData(jsonDataList);
-            } catch (org.json.JSONException e) {
-                throw new IllegalArgumentException("Error parsing FormData with id: " + data.getId() + ": " + e.getMessage());
-            }
-
-            formDataResponses.add(formDataResponse);
-        }
-
-        return formDataResponses;
-    }
-
-    @Override
-    public FormResponse getFormTemplateById(UUID templateId){
-
-        if(templateId==null){
-            throw new IllegalArgumentException("Template ID is required");
-        }
-
-        FormTemplate formTemplate = formRepository.findById(templateId).orElseThrow(()->new IllegalArgumentException("Form Template with template ID : "+templateId+" does not exist."));
-
-        try {
-            FormResponse formResponse = new FormResponse();
-            formResponse.setTemplateId(formTemplate.getId());
-            formResponse.setName(formTemplate.getName());
-
-            List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {
-            });
-
-
-            formResponse.setJsonSchema(parsedSchema);
-
-            return formResponse;
-
-        }catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to parse schema for form, " +formTemplate.getId()+ ", "+ e.getMessage());
-
-        }
-
-    }
-
-
-    @Override
-    public void deleteFormTemplateById(UUID templateId){
-
-        if(templateId==null){
-            throw new IllegalArgumentException("Template ID is required");
-        }
-
-        if(formRepository.findById(templateId).isPresent()) {
-            formRepository.deleteById(templateId);
-        }else{
-            throw new IllegalArgumentException("Form Template with Template ID: "+templateId+" does not exist. ");
-        }
-
-    }
-
-    @Override
-    public void deleteFormDataById(UUID formId){
-        if(formId==null){
-            throw new IllegalArgumentException("Form ID is required");
-        }
-
-        FormData formData = formDataRepository.findById(formId).orElseThrow(()->new IllegalArgumentException("Form data with provide id does not exist"));
-
-        String userEmail = formData.getUser().getEmail();
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new IllegalStateException("User not authenticated");
-        }
-
-        String email = ((UserDetails) authentication.getPrincipal()).getUsername();
-
-        if(!Objects.equals(email, userEmail)){
-            throw new AccessDeniedException("You don't have access to delete this form.");
-        }
-
-        formDataRepository.deleteById(formId);
-
-    }
-
 
 }
-
-
