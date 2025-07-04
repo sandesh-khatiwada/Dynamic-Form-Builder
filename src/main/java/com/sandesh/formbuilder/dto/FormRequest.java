@@ -16,4 +16,6 @@ public class FormRequest {
     @NotNull(message = "JSON schema is required")
     @ValidJsonSchema
     private List<Map<String, Object>> jsonSchema;
+
+    private boolean allowEdit;
 }

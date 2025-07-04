@@ -23,6 +23,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
@@ -47,13 +48,15 @@ public class FormServiceImpl implements FormService {
             FormTemplate formTemplate = new FormTemplate();
             formTemplate.setName(formCreationRequest.getName());
             formTemplate.setJsonSchema(jsonSchemaString);
+            formTemplate.setAllowEdit(formCreationRequest.isAllowEdit());
             FormTemplate form = formRepository.save(formTemplate);
 
             FormResponse formCreationResponse = new FormResponse();
             formCreationResponse.setTemplateId(form.getId());
             formCreationResponse.setName(form.getName());
+            formCreationResponse.setCreatedAt(form.getCreatedAt());
             formCreationResponse.setJsonSchema(formCreationRequest.getJsonSchema());
-
+            formCreationResponse.setAllowEdit(form.isAllowEdit());
             return formCreationResponse;
         } catch (JsonProcessingException exception) {
             throw new IllegalArgumentException("Invalid JSON schema: " + exception.getMessage());
@@ -69,7 +72,8 @@ public class FormServiceImpl implements FormService {
                 FormResponse formResponse = new FormResponse();
                 formResponse.setTemplateId(formTemplate.getId());
                 formResponse.setName(formTemplate.getName());
-
+                formResponse.setCreatedAt(formTemplate.getCreatedAt());
+                formResponse.setAllowEdit(formTemplate.isAllowEdit());
                 List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {});
                 formResponse.setJsonSchema(parsedSchema);
                 formResponses.add(formResponse);
@@ -112,7 +116,7 @@ public class FormServiceImpl implements FormService {
             FormDataResponse formDataResponse = new FormDataResponse();
             formDataResponse.setFormDataId(savedFormData.getId());
             formDataResponse.setJsonData(formDataRequest.getJsonData());
-
+            formDataResponse.setCreatedAt(savedFormData.getCreatedAt());
             return formDataResponse;
         } catch (org.json.JSONException e) {
             throw new IllegalArgumentException("Invalid schema for form template with id: " + formId + ": " + e.getMessage());
@@ -134,6 +138,7 @@ public class FormServiceImpl implements FormService {
         for (FormData data : formData) {
             FormDataResponse formDataResponse = new FormDataResponse();
             formDataResponse.setFormDataId(data.getId());
+            formDataResponse.setCreatedAt(data.getCreatedAt());
 
             // Convert JSON string to List<Map<String, Object>>
             List<Map<String, Object>> jsonDataList = new ArrayList<>();
@@ -166,6 +171,9 @@ public class FormServiceImpl implements FormService {
             FormResponse formResponse = new FormResponse();
             formResponse.setTemplateId(formTemplate.getId());
             formResponse.setName(formTemplate.getName());
+            formResponse.setCreatedAt(formTemplate.getCreatedAt());
+            formResponse.setAllowEdit(formTemplate.isAllowEdit());
+
 
             List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {});
             formResponse.setJsonSchema(parsedSchema);
@@ -226,6 +234,12 @@ public class FormServiceImpl implements FormService {
                 .orElseThrow(() -> new IllegalArgumentException("Form Data ID is invalid"));
 
 
+        if(!existingFormData.getFormTemplate().isAllowEdit()){
+            throw new AccessDeniedException("You can not edit this form data");
+        }
+
+
+
         //Only user who has created the form data can edit it
         String userEmail = existingFormData.getUser().getEmail();
 
@@ -259,6 +273,7 @@ public class FormServiceImpl implements FormService {
         FormDataResponse formDataResponse = new FormDataResponse();
         formDataResponse.setFormDataId(savedFormData.getId());
         formDataResponse.setJsonData(newFormData.getJsonData());
+        formDataResponse.setCreatedAt(savedFormData.getCreatedAt());
 
         return formDataResponse;
     }
@@ -292,6 +307,7 @@ public class FormServiceImpl implements FormService {
         try {
             FormDataResponse formDataResponse = new FormDataResponse();
             formDataResponse.setFormDataId(formData.getId());
+            formDataResponse.setCreatedAt(formData.getCreatedAt());
 
             List<Map<String, Object>> jsonDataList = new ArrayList<>();
             jsonDataList = objectMapper.readValue(formData.getJsonData(), new TypeReference<List<Map<String, Object>>>() {
