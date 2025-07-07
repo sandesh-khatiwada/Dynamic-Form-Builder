@@ -110,6 +110,18 @@ public class GlobalExceptionHandler{
         return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
     }
 
+
+    // Generic Exception
+    @ExceptionHandler(FormExportException.class)
+    public ResponseEntity<APIResponse<Object>> handleFormExportException(FormExportException ex) {
+        APIResponse<Object> response = new APIResponse<>(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "An error occured during form export",
+                Collections.singletonList(ex.getMessage())
+        );
+        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<APIResponse<Object>> handleRuntimeException(RuntimeException ex) {
 

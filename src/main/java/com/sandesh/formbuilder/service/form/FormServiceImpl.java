@@ -10,6 +10,7 @@ import com.sandesh.formbuilder.dto.FormResponse;
 import com.sandesh.formbuilder.entity.FormData;
 import com.sandesh.formbuilder.entity.FormTemplate;
 import com.sandesh.formbuilder.entity.User;
+import com.sandesh.formbuilder.exception.FormExportException;
 import com.sandesh.formbuilder.repository.FormDataRepository;
 import com.sandesh.formbuilder.repository.FormRepository;
 import com.sandesh.formbuilder.repository.UserRepository;
@@ -452,7 +453,7 @@ public class FormServiceImpl implements FormService {
             workbook.write(response.getOutputStream());
             workbook.dispose(); // Clean up temporary files
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new FormExportException("Error creating Excel workbook");
         }
     }
 
