@@ -13,17 +13,24 @@ import com.sandesh.formbuilder.entity.User;
 import com.sandesh.formbuilder.repository.FormDataRepository;
 import com.sandesh.formbuilder.repository.FormRepository;
 import com.sandesh.formbuilder.repository.UserRepository;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
@@ -38,6 +45,7 @@ public class FormServiceImpl implements FormService {
     private final FormDataRepository formDataRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final JavaMailSender mailSender;
 
     @Override
     public FormResponse createForm(FormRequest formCreationRequest) {
@@ -64,8 +72,14 @@ public class FormServiceImpl implements FormService {
     }
 
     @Override
-    public List<FormResponse> getAllForms() {
-        List<FormTemplate> forms = formRepository.findAll();
+    @Transactional
+    public List<FormResponse> getAllForms(int offset, int limit, String name) {
+        List<FormTemplate> forms;
+        if (name != null && !name.trim().isEmpty()) {
+            forms = formRepository.findByNameWithOffsetAndLimit(name.trim(), offset, limit);
+        } else {
+            forms = formRepository.findAllWithOffsetAndLimit(offset, limit);
+        }
         List<FormResponse> formResponses = new ArrayList<>();
         for (FormTemplate formTemplate : forms) {
             try {
@@ -84,8 +98,9 @@ public class FormServiceImpl implements FormService {
         return formResponses;
     }
 
+
     @Override
-    public FormDataResponse fillUpForm(FormDataRequest formDataRequest, UUID formId) {
+    public FormDataResponse fillUpForm(FormDataRequest formDataRequest, UUID formId, boolean provideResponse) {
         if (formId == null) {
             throw new IllegalArgumentException("Form Template ID is required");
         }
@@ -95,8 +110,10 @@ public class FormServiceImpl implements FormService {
             throw new IllegalStateException("User not authenticated");
         }
 
-        String email = ((UserDetails) authentication.getPrincipal()).getUsername();
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalStateException("User not found"));
+        // Extract email from JWT token
+        String email = extractEmailFromToken(authentication);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
 
         // Retrieve the form template
         FormTemplate formTemplate = formRepository.findById(formId)
@@ -117,6 +134,12 @@ public class FormServiceImpl implements FormService {
             formDataResponse.setFormDataId(savedFormData.getId());
             formDataResponse.setJsonData(formDataRequest.getJsonData());
             formDataResponse.setCreatedAt(savedFormData.getCreatedAt());
+
+            // Send email if provideResponse is true
+            if (provideResponse) {
+                sendResponseEmail(email, formDataRequest.getJsonData(), formTemplate.getName());
+            }
+
             return formDataResponse;
         } catch (org.json.JSONException e) {
             throw new IllegalArgumentException("Invalid schema for form template with id: " + formId + ": " + e.getMessage());
@@ -125,14 +148,16 @@ public class FormServiceImpl implements FormService {
         }
     }
 
+
+
     @Override
-    @Transactional
-    public List<FormDataResponse> getFormDataByTemplateId(UUID templateId) {
+    @Transactional()
+    public List<FormDataResponse> getFormDataByTemplateId(UUID templateId, int offset, int limit) {
         if (templateId == null) {
             throw new IllegalArgumentException("Template Id is required");
         }
 
-        List<FormData> formData = formDataRepository.findByFormTemplateId(templateId);
+        List<FormData> formData = formDataRepository.findByFormTemplateIdWithOffsetAndLimit(templateId, offset, limit);
         List<FormDataResponse> formDataResponses = new ArrayList<>();
 
         for (FormData data : formData) {
@@ -323,6 +348,62 @@ public class FormServiceImpl implements FormService {
 
     }
 
+    @Transactional
+    public void exportFormDataToExcel(UUID templateId, HttpServletResponse response) {
+
+        FormTemplate formTemplate = formRepository.findById(templateId)
+                .orElseThrow(() -> new IllegalArgumentException("Form Template with ID " + templateId + " not found"));
+
+        // Fetch all FormData for the template
+        List<FormData> formDataList = formDataRepository.findByFormTemplateId(templateId);
+        if (formDataList.isEmpty()) {
+            throw new IllegalArgumentException("No form data found for template ID " + templateId);
+        }
+
+        // Create a streaming workbook for large datasets
+        try (SXSSFWorkbook workbook = new SXSSFWorkbook()) {
+            // Create a sheet
+            Sheet sheet = workbook.createSheet(formTemplate.getName() + "Responses");
+
+            // Create header row
+            Row headerRow = sheet.createRow(0);
+            List<Map<String, Object>> schema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {});
+            int columnIndex = 0;
+            for (Map<String, Object> field : schema) {
+                Cell cell = headerRow.createCell(columnIndex++);
+                cell.setCellValue((String) field.get("key")); // Use key as column header
+            }
+            headerRow.createCell(columnIndex).setCellValue("Created At"); // Add createdAt column
+
+            // Populate data rows
+            int rowNum = 1;
+            for (FormData formData : formDataList) {
+                Row row = sheet.createRow(rowNum++);
+                List<Map<String, Object>> jsonData = objectMapper.readValue(formData.getJsonData(), new TypeReference<List<Map<String, Object>>>() {});
+
+                columnIndex = 0;
+                for (Map<String, Object> data : jsonData) {
+                    Cell cell = row.createCell(columnIndex++);
+                    cell.setCellValue(data.get("value") != null ? data.get("value").toString() : "");
+                }
+                // Add createdAt
+                Cell createdAtCell = row.createCell(columnIndex);
+                createdAtCell.setCellValue(formData.getCreatedAt() != null ? formData.getCreatedAt().toString() : "");
+            }
+
+            // Set response headers
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            String filename = "form_responses_" + templateId + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+            response.setHeader("Content-Disposition", "attachment; filename=" + filename);
+
+            // Write the workbook to the response output stream
+            workbook.write(response.getOutputStream());
+            workbook.dispose(); // Clean up temporary files
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private FormData validateFormData(FormTemplate formTemplate, List<Map<String, Object>> jsonData) {
         // Get and validate the JSON schema (field definitions)
         String jsonSchemaString = formTemplate.getJsonSchema();
@@ -467,6 +548,60 @@ public class FormServiceImpl implements FormService {
         } catch (Exception e) {
             throw new IllegalArgumentException("Error processing form data: " + e.getMessage());
         }
+    }
+
+    private String extractEmailFromToken(Authentication authentication) {
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserDetails) {
+            // Assuming UserDetails implementation stores the JWT claims
+            String email = ((UserDetails) principal).getUsername(); // Adjust based on your JWT setup
+            // Here, you would typically decode the JWT to get the 'sub' claim
+            // This is a simplified example; use a JWT library like jjwt
+            return email; // Replace with actual JWT decoding logic
+        }
+        throw new IllegalStateException("Unable to extract email from token");
+    }
+
+    private void sendResponseEmail(String to, List<Map<String, Object>> formData, String formName) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject("Form Response Submission - " + formName);
+        message.setText(buildEmailBody(formData, formName));
+        mailSender.send(message);
+    }
+
+
+    private String buildEmailBody(List<Map<String, Object>> formData, String formName) {
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        DateTimeFormatter datetimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+
+        StringBuilder body = new StringBuilder();
+        body.append("Thank you for submitting the form: ").append(formName).append("\n\n");
+        body.append("Your responses:\n");
+        for (Map<String, Object> field : formData) {
+            String label = (String) field.get("label");
+            Object value = field.get("value");
+
+            if(field.get("type").equals("date")){
+                if (value instanceof String) {
+                    LocalDate date = LocalDate.parse((String) value, DateTimeFormatter.ISO_LOCAL_DATE);
+                    value = date.format(dateFormatter);
+                }
+            }
+
+            else if(field.get("type").equals("datetime")){
+                if (value instanceof String) {
+                    LocalDateTime datetime = LocalDateTime.parse((String) value, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                    value = datetime.format(datetimeFormatter);
+                }
+            }
+
+
+            body.append(label).append(": ").append(value != null ? value.toString() : "N/A").append("\n");
+        }
+        body.append("\nSubmitted on: ").append(LocalDateTime.now().format(datetimeFormatter));
+        return body.toString();
     }
 
 

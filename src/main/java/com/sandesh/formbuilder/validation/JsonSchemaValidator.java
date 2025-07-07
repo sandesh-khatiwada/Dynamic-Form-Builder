@@ -66,7 +66,7 @@ public class JsonSchemaValidator implements ConstraintValidator<ValidJsonSchema,
                         return false;
                     }
                     break;
-                // No value type checks here, as this is schema validation
+
             }
         }
         return true;

@@ -6,9 +6,9 @@ import com.sandesh.formbuilder.dto.FormRequest;
 import com.sandesh.formbuilder.dto.FormResponse;
 import com.sandesh.formbuilder.service.form.FormService;
 import com.sandesh.formbuilder.util.APIResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -40,9 +40,12 @@ public class FormController {
     }
 
     @GetMapping("/forms")
-    public ResponseEntity<APIResponse<List<FormResponse>>> getAllForms(){
-         List<FormResponse> forms= formService.getAllForms();
+    public ResponseEntity<APIResponse<List<FormResponse>>> getAllForms(
+            @RequestParam(defaultValue = "0") int offset,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) String name) {
 
+        List<FormResponse> forms = formService.getAllForms(offset, limit, name);
 
         APIResponse<List<FormResponse>> apiResponse = new APIResponse<>(
                 HttpStatus.OK,
@@ -50,12 +53,11 @@ public class FormController {
                 forms
         );
 
-        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
-
+        return new ResponseEntity<>(apiResponse, HttpStatus.OK);
     }
 
     @GetMapping("/forms/{id}")
-    public ResponseEntity<APIResponse<FormResponse>> getAllForms(@PathVariable UUID id){
+    public ResponseEntity<APIResponse<FormResponse>> getFormtemplateById(@PathVariable UUID id){
         FormResponse form= formService.getFormTemplateById(id);
 
 
@@ -71,10 +73,12 @@ public class FormController {
 
 
     @PostMapping("/forms/{id}/data")
-    public ResponseEntity<APIResponse<FormDataResponse>> fillUpForm(@RequestBody FormDataRequest formDataRequest, @PathVariable UUID id){
+    public ResponseEntity<APIResponse<FormDataResponse>> fillUpForm(
+            @RequestBody FormDataRequest formDataRequest,
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "false") boolean provideResponse) {
 
-        FormDataResponse formDataResponse = formService.fillUpForm(formDataRequest, id);
-
+        FormDataResponse formDataResponse = formService.fillUpForm(formDataRequest, id, provideResponse);
 
         APIResponse<FormDataResponse> apiResponse = new APIResponse<>(
                 HttpStatus.OK,
@@ -82,13 +86,16 @@ public class FormController {
                 formDataResponse
         );
 
-        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
-
+        return new ResponseEntity<>(apiResponse, HttpStatus.OK);
     }
 
     @GetMapping("/forms/{id}/data")
-    public ResponseEntity<APIResponse<List<FormDataResponse>>> getFormDataByTemplateId(@PathVariable UUID id){
-        List<FormDataResponse> formDataResponses = formService.getFormDataByTemplateId(id);
+    public ResponseEntity<APIResponse<List<FormDataResponse>>> getFormDataByTemplateId(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "0") int offset,
+            @RequestParam(defaultValue = "10") int limit) {
+
+        List<FormDataResponse> formDataResponses = formService.getFormDataByTemplateId(id, offset, limit);
 
         APIResponse<List<FormDataResponse>> apiResponse = new APIResponse<>(
                 HttpStatus.OK,
@@ -96,7 +103,7 @@ public class FormController {
                 formDataResponses
         );
 
-        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
+        return new ResponseEntity<>(apiResponse, HttpStatus.OK);
     }
 
 
@@ -154,6 +161,19 @@ public class FormController {
 
         return new ResponseEntity<>(apiResponse,HttpStatus.OK);
 
+    }
+
+    @GetMapping("/forms/{id}/data/excel-sheet")
+    public ResponseEntity<APIResponse<Object>> exportExcelSheet(@PathVariable UUID id , HttpServletResponse response){
+
+        formService.exportFormDataToExcel(id,response);
+
+        APIResponse<Object> apiResponse = new APIResponse<>(
+                HttpStatus.OK,
+                "Excel file exported successfully"
+        );
+
+        return new ResponseEntity<>(apiResponse,HttpStatus.OK);
     }
 
 
