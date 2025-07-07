@@ -106,6 +106,21 @@ public class FormController {
         return new ResponseEntity<>(apiResponse, HttpStatus.OK);
     }
 
+    @GetMapping("/forms/{id}/response")
+    public ResponseEntity<APIResponse<List<FormDataResponse>>> getFormResponseByTemplateId(
+            @PathVariable UUID id) {
+
+        List<FormDataResponse> formDataResponses = formService.getFormResponseByTemplateId(id);
+
+        APIResponse<List<FormDataResponse>> apiResponse = new APIResponse<>(
+                HttpStatus.OK,
+                "Form data retrieved successfully",
+                formDataResponses
+        );
+
+        return new ResponseEntity<>(apiResponse, HttpStatus.OK);
+    }
+
 
     @DeleteMapping("/forms/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -175,6 +190,8 @@ public class FormController {
 
         return new ResponseEntity<>(apiResponse,HttpStatus.OK);
     }
+
+
 
 
 }

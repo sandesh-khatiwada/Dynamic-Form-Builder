@@ -184,6 +184,54 @@ public class FormServiceImpl implements FormService {
     }
 
     @Override
+    @Transactional
+    public List<FormDataResponse> getFormResponseByTemplateId(UUID templateId){
+        if (templateId == null) {
+            throw new IllegalArgumentException("Template Id is required");
+        }
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("User not authenticated");
+        }
+
+        // Extract email from JWT token
+        String email = extractEmailFromToken(authentication);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+
+
+        //Get form data with templateId and user
+        List<FormData> formData = formDataRepository.findByFormTemplateIdAndUserId(templateId, user.getId());
+
+
+        List<FormDataResponse> formDataResponses = new ArrayList<>();
+
+        for (FormData data : formData) {
+            FormDataResponse formDataResponse = new FormDataResponse();
+            formDataResponse.setFormDataId(data.getId());
+            formDataResponse.setCreatedAt(data.getCreatedAt());
+
+            // Convert JSON string to List<Map<String, Object>>
+            List<Map<String, Object>> jsonDataList = new ArrayList<>();
+            try {
+                if (data.getJsonData() != null && !data.getJsonData().trim().isEmpty()) {
+                    // Parse the stored JSON string using ObjectMapper to handle any format
+                    jsonDataList = objectMapper.readValue(data.getJsonData(), new TypeReference<List<Map<String, Object>>>() {});
+                }
+                formDataResponse.setJsonData(jsonDataList);
+            } catch (JsonProcessingException e) {
+                throw new IllegalArgumentException("Error parsing FormData with id: " + data.getId() + ": " + e.getMessage());
+            }
+
+            formDataResponses.add(formDataResponse);
+        }
+
+        return formDataResponses;
+    }
+
+
+    @Override
     public FormResponse getFormTemplateById(UUID templateId) {
         if (templateId == null) {
             throw new IllegalArgumentException("Template ID is required");
@@ -553,11 +601,8 @@ public class FormServiceImpl implements FormService {
     private String extractEmailFromToken(Authentication authentication) {
         Object principal = authentication.getPrincipal();
         if (principal instanceof UserDetails) {
-            // Assuming UserDetails implementation stores the JWT claims
-            String email = ((UserDetails) principal).getUsername(); // Adjust based on your JWT setup
-            // Here, you would typically decode the JWT to get the 'sub' claim
-            // This is a simplified example; use a JWT library like jjwt
-            return email; // Replace with actual JWT decoding logic
+            String email = ((UserDetails) principal).getUsername();
+            return email;
         }
         throw new IllegalStateException("Unable to extract email from token");
     }

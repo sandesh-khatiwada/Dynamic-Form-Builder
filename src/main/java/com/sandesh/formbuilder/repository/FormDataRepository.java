@@ -12,4 +12,7 @@ public interface FormDataRepository extends JpaRepository<FormData, UUID> {
 
     @Query(value = "SELECT * FROM form_data WHERE form_template_id = ?1 ORDER BY created_at DESC LIMIT ?3 OFFSET ?2", nativeQuery = true)
     List<FormData> findByFormTemplateIdWithOffsetAndLimit(UUID templateId, int offset, int limit);
+
+    @Query(value = "SELECT * FROM form_data WHERE form_template_id = ?1 AND user_id = ?2 ORDER BY created_at DESC", nativeQuery = true)
+    List<FormData> findByFormTemplateIdAndUserId(UUID formTemplateId, UUID userId);
 }

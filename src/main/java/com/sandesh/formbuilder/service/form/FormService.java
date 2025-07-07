@@ -15,6 +15,7 @@ public interface FormService {
     List<FormResponse> getAllForms(int offset, int limit, String name);
     FormDataResponse fillUpForm(FormDataRequest formDataRequest, UUID formTemplateId, boolean provideResponse);
     List<FormDataResponse> getFormDataByTemplateId(UUID templateId, int offset, int limit);
+    List<FormDataResponse> getFormResponseByTemplateId(UUID id);
     FormResponse getFormTemplateById(UUID templateId);
     void deleteFormTemplateById(UUID templateId);
     void deleteFormDataById(UUID formId);
