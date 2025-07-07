@@ -14,13 +14,17 @@ import com.sandesh.formbuilder.repository.FormDataRepository;
 import com.sandesh.formbuilder.repository.FormRepository;
 import com.sandesh.formbuilder.repository.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.transaction.Transactional;
+//import jakarta.transaction.Transactional;
+
+import org.springframework.transaction.annotation.Transactional;
+
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -72,7 +76,7 @@ public class FormServiceImpl implements FormService {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public List<FormResponse> getAllForms(int offset, int limit, String name) {
         List<FormTemplate> forms;
         if (name != null && !name.trim().isEmpty()) {
@@ -141,7 +145,7 @@ public class FormServiceImpl implements FormService {
             }
 
             return formDataResponse;
-        } catch (org.json.JSONException e) {
+        } catch (JSONException e) {
             throw new IllegalArgumentException("Invalid schema for form template with id: " + formId + ": " + e.getMessage());
         } catch (Exception e) {
             throw new IllegalArgumentException("Error parsing form data: " + e.getMessage());
@@ -151,7 +155,7 @@ public class FormServiceImpl implements FormService {
 
 
     @Override
-    @Transactional()
+    @Transactional(readOnly = true)
     public List<FormDataResponse> getFormDataByTemplateId(UUID templateId, int offset, int limit) {
         if (templateId == null) {
             throw new IllegalArgumentException("Template Id is required");
@@ -184,7 +188,7 @@ public class FormServiceImpl implements FormService {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public List<FormDataResponse> getFormResponseByTemplateId(UUID templateId){
         if (templateId == null) {
             throw new IllegalArgumentException("Template Id is required");
@@ -396,7 +400,7 @@ public class FormServiceImpl implements FormService {
 
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public void exportFormDataToExcel(UUID templateId, HttpServletResponse response) {
 
         FormTemplate formTemplate = formRepository.findById(templateId)
@@ -589,7 +593,7 @@ public class FormServiceImpl implements FormService {
             formData.setJsonData(objectMapper.writeValueAsString(jsonData));
             return formData;
 
-        } catch (org.json.JSONException e) {
+        } catch (JSONException e) {
             throw new IllegalArgumentException("Invalid JSON schema for form template with id: " + formTemplate.getId() + ": " + e.getMessage());
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Error serializing form data: " + e.getMessage());
