@@ -15,7 +15,6 @@ import com.sandesh.formbuilder.repository.FormDataRepository;
 import com.sandesh.formbuilder.repository.FormRepository;
 import com.sandesh.formbuilder.repository.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
-//import jakarta.transaction.Transactional;
 
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +61,7 @@ public class FormServiceImpl implements FormService {
             formTemplate.setName(formCreationRequest.getName());
             formTemplate.setJsonSchema(jsonSchemaString);
             formTemplate.setAllowEdit(formCreationRequest.isAllowEdit());
+            formTemplate.setAllowDelete(formCreationRequest.isAllowDelete());
             FormTemplate form = formRepository.save(formTemplate);
 
             FormResponse formCreationResponse = new FormResponse();
@@ -70,6 +70,7 @@ public class FormServiceImpl implements FormService {
             formCreationResponse.setCreatedAt(form.getCreatedAt());
             formCreationResponse.setJsonSchema(formCreationRequest.getJsonSchema());
             formCreationResponse.setAllowEdit(form.isAllowEdit());
+            formCreationResponse.setAllowDelete(form.isAllowDelete());
             return formCreationResponse;
         } catch (JsonProcessingException exception) {
             throw new IllegalArgumentException("Invalid JSON schema: " + exception.getMessage());
@@ -93,6 +94,7 @@ public class FormServiceImpl implements FormService {
                 formResponse.setName(formTemplate.getName());
                 formResponse.setCreatedAt(formTemplate.getCreatedAt());
                 formResponse.setAllowEdit(formTemplate.isAllowEdit());
+                formResponse.setAllowDelete(formTemplate.isAllowDelete());
                 List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {});
                 formResponse.setJsonSchema(parsedSchema);
                 formResponses.add(formResponse);
@@ -251,6 +253,7 @@ public class FormServiceImpl implements FormService {
             formResponse.setName(formTemplate.getName());
             formResponse.setCreatedAt(formTemplate.getCreatedAt());
             formResponse.setAllowEdit(formTemplate.isAllowEdit());
+            formResponse.setAllowDelete(formTemplate.isAllowDelete());
 
 
             List<Map<String, Object>> parsedSchema = objectMapper.readValue(formTemplate.getJsonSchema(), new TypeReference<List<Map<String, Object>>>() {});
@@ -424,9 +427,9 @@ public class FormServiceImpl implements FormService {
             int columnIndex = 0;
             for (Map<String, Object> field : schema) {
                 Cell cell = headerRow.createCell(columnIndex++);
-                cell.setCellValue((String) field.get("key")); // Use key as column header
+                cell.setCellValue((String) field.get("label")); // label is used as column header
             }
-            headerRow.createCell(columnIndex).setCellValue("Created At"); // Add createdAt column
+            headerRow.createCell(columnIndex).setCellValue("Submitted At");
 
             // Populate data rows
             int rowNum = 1;
@@ -503,21 +506,22 @@ public class FormServiceImpl implements FormService {
 
                 // Validate value based on type
                 String type = schemaItem.getString("type").toLowerCase();
+                boolean required = schemaItem.getBoolean("required");
                 Object value = dataItem.get("value");
                 switch (type) {
                     case "text":
                     case "textarea":
-                        if (!(value instanceof String)) {
+                        if (required && !(value instanceof String)) {
                             throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a string");
                         }
                         break;
                     case "number":
-                        if (!(value instanceof Number)) {
+                        if (required && !(value instanceof Number)) {
                             throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a number");
                         }
                         break;
                     case "dropdown":
-                        if (!(value instanceof String)) {
+                        if ( required && !(value instanceof String)) {
                             throw new IllegalArgumentException("Data at index " + i + ": value for key '" + schemaItem.getString("key") + "' must be a string");
                         }
                         if (schemaItem.has("options")) {

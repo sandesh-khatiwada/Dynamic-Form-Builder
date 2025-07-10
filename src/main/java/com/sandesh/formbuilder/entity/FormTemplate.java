@@ -1,5 +1,6 @@
 package com.sandesh.formbuilder.entity;
 
+import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -29,7 +30,10 @@ public class FormTemplate {
     @OneToMany(mappedBy = "formTemplate", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FormData> formDataList = new ArrayList<>();
 
+
     private boolean allowEdit;
+
+    private boolean allowDelete;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -15,6 +15,7 @@ public class FormResponse {
     private List<Map<String, Object>> jsonSchema;
     private LocalDateTime createdAt;
     private boolean allowEdit;
+    private boolean allowDelete;
 
 
 }

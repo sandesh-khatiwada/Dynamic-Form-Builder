@@ -111,7 +111,7 @@ public class GlobalExceptionHandler{
     }
 
 
-    // Generic Exception
+    // Form Export Exception
     @ExceptionHandler(FormExportException.class)
     public ResponseEntity<APIResponse<Object>> handleFormExportException(FormExportException ex) {
         APIResponse<Object> response = new APIResponse<>(

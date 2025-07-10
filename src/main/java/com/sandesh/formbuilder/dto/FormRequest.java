@@ -18,4 +18,6 @@ public class FormRequest {
     private List<Map<String, Object>> jsonSchema;
 
     private boolean allowEdit;
+
+    private boolean allowDelete;
 }
